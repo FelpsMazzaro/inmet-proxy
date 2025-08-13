@@ -2,36 +2,36 @@ import fetch from "node-fetch";
 import { JSDOM } from "jsdom";
 
 export default async function handler(req, res) {
-    try {
-        // Buscar HTML da página do INMET
-        const url = "https://portal.inmet.gov.br/paginas/catalogoaut";
-        const response = await fetch(url);
-        const html = await response.text();
+  try {
+    const url = "https://portal.inmet.gov.br/paginas/catalogoaut";
+    const response = await fetch(url);
 
-        // Parsear HTML
-        const dom = new JSDOM(html);
-        const rows = dom.window.document.querySelectorAll("table tbody tr");
-
-        const data = [];
-        rows.forEach(row => {
-            const cols = row.querySelectorAll("td");
-            if (cols.length >= 5) {
-                const codigo = cols[0].textContent.trim();
-                const nome = cols[1].textContent.trim()
-                    .toLowerCase()
-                    .replace(/\b\w/g, l => l.toUpperCase());
-                const estado = cols[2].textContent.trim();
-                const latitude = parseFloat(cols[3].textContent.trim().replace(",", "."));
-                const longitude = parseFloat(cols[4].textContent.trim().replace(",", "."));
-
-                data.push({ codigo, nome, estado, latitude, longitude });
-            }
-        });
-
-        res.setHeader("Content-Type", "application/json");
-        res.status(200).json(data);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Erro ao buscar dados do INMET" });
+    if (!response.ok) {
+      return res.status(500).json({ error: "Erro ao acessar o site do INMET" });
     }
+
+    const html = await response.text();
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    const rows = Array.from(document.querySelectorAll("table tbody tr"));
+    const estacoes = rows.map(row => {
+      const cols = row.querySelectorAll("td");
+      return {
+        codigo: cols[7]?.textContent.trim(),
+        nome: cols[0]?.textContent.trim().toLowerCase().replace(/(^|\s)\S/g, l => l.toUpperCase()),
+        estado: cols[1]?.textContent.trim(),
+        latitude: parseFloat(cols[3]?.textContent.replace(",", ".")),
+        longitude: parseFloat(cols[4]?.textContent.replace(",", "."))
+      };
+    }).filter(est => est.codigo && !isNaN(est.latitude) && !isNaN(est.longitude));
+
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Content-Type", "application/json");
+    return res.status(200).json(estacoes);
+
+  } catch (error) {
+    console.error("Erro no handler:", error);
+    return res.status(500).json({ error: "Erro ao processar dados" });
+  }
 }
