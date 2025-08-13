@@ -1,0 +1,9 @@
+{
+    "name": "inmet-proxy",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "jsdom": "^26.1.0",
+        "node-fetch": "^2.7.0"
+    }
+}
